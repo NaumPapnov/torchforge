@@ -1,15 +1,17 @@
-from torch.nn import Module, CrossEntropyLoss
+from torch.nn import Module
 from torch import no_grad, max, save
 from torch.utils.data import DataLoader
-from torch.optim import Optimizer, Adam
+from torch.optim import Optimizer
 from tqdm.auto import tqdm
 from typing import Tuple
 from dataclasses import dataclass
+
+
+
 @dataclass
 class TrainerArgs:
     # arguments for the trainer, e.g. learning rate, batch size, number of epochs, etc.
     loss_func: Module
-    optimizer: Optimizer = Adam
     learning_rate: float = 1e-3
     batch_size: int = 64
     device: str = 'cpu'
@@ -24,11 +26,13 @@ class Trainer:
         self,
         model: Module,
         args: TrainerArgs,
+        optimizer: Optimizer,
         train_data_loader: DataLoader,
         valid_data_loader: DataLoader
     ) -> None:
-        self.model = model
+        self.model = model.to(args.device)
         self.args = args
+        self.optimizer = optimizer
         self.train_data_loader = train_data_loader
         self.valid_data_loader = valid_data_loader
 
@@ -39,14 +43,12 @@ class Trainer:
             x_batch, y_batch = x_batch.to(self.args.device), y_batch.to(self.args.device)
 
             predictions = self.model(x_batch)
-            print(predictions.shape, y_batch.shape)
             loss = self.args.loss_func(predictions, y_batch)
 
             total_loss += loss.item()
-            optimizer = self.args.optimizer(self.model.parameters(), self.args.learning_rate)
             loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            self.optimizer.step()
+            self.optimizer.zero_grad()
         avg_loss = total_loss / len(self.train_data_loader)
         return avg_loss
 
@@ -94,6 +96,7 @@ class Trainer:
                 save({
                     "epoch": epoch + 1,
                     "model_state_dict": self.model.state_dict(),
+                    "optimizer_state_dict": self.optimizer.state_dict(),
                     "train_loss": train_loss,
                     "val_loss": val_loss,
                     "val_accuracy": val_accur,
