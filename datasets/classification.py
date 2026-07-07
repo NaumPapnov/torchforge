@@ -1,26 +1,23 @@
 from torch.utils.data import Dataset
-from typing import Optional, Callable, Any
+from typing import Any, Union
 from pandas import DataFrame, Series
+from numpy import ndarray
+from torch import tensor, FloatTensor
 
 # implementstion of synthetic dataset for classification task, which inherits from the base dataset class
 class ClassificationTableDataset(Dataset):
     def __init__(
             self,
-            data: DataFrame,
-            targets: Series,
-            transform: Optional[Callable] = None,
-            target_transform: Optional[Callable] = None
+            data: Union[Series, DataFrame, ndarray, tensor],
+            targets: Union[Series, DataFrame, ndarray, tensor]
     ) -> None:
-        super().__init__(data, targets, transform, target_transform)
+        self.data = FloatTensor(data)
+        self.targets = FloatTensor(targets).view(-1, 1)
 
     def __len__(self) -> int:
-        return len(self.target)
+        return len(self.targets)
     
     def __getitem__(self, index: int) -> tuple[Any, Any]:
         features, target = self.data[index], self.targets[index]
-        if self.transform is not None:
-            features = self.transform(features)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
 
         return features, target

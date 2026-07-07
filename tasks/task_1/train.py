@@ -8,18 +8,19 @@ from sklearn.model_selection import train_test_split
 from datasets.classification import ClassificationTableDataset
 from torch.utils.data import DataLoader
 import torch
-def train(model, args):
-    trainer = Trainer(model, args)
-    trainer.train(train_data_loader, val_data_loader)
+def train(model, args, train_data_loader, valid_data_loader):
+    trainer = Trainer(model, args, train_data_loader, valid_data_loader)
+    trainer.train()
 
-device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
-args = TrainerArgs(BCELoss, device=device)
-model = SimpleBinaryClassificationNet().to(args.device)
-X, y = make_classification(n_samples=5000, n_features=20, random_state=42, n_classes=2)
-X_train, X_val, y_train, y_val = train_test_split(X, y)
-train_dataset = ClassificationTableDataset(X_train, y_train)
-val_dataset = ClassificationTableDataset(X_val, y_val)
-train_data_loader = DataLoader(train_dataset, args.batch_size, shuffle=True)
-val_data_loader = DataLoader(val_dataset, args.batch_size, shuffle=False)
 if __name__ == "__main__":
-    train(model, args)
+    loss = BCELoss()
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
+    args = TrainerArgs(loss, device=device)
+    model = SimpleBinaryClassificationNet().to(args.device)
+    X, y = make_classification(n_samples=5000, n_features=20, random_state=42, n_classes=2)
+    X_train, X_val, y_train, y_val = train_test_split(X, y)
+    train_dataset = ClassificationTableDataset(X_train, y_train)
+    valid_dataset = ClassificationTableDataset(X_val, y_val)
+    train_data_loader = DataLoader(train_dataset, args.batch_size, shuffle=True)
+    valid_data_loader = DataLoader(valid_dataset, args.batch_size, shuffle=False)
+    train(model, args, train_data_loader, valid_data_loader)

@@ -1,8 +1,8 @@
 from torch.nn import Module, Sequential, Linear, ReLU, Sigmoid
 
 class SimpleBinaryClassificationNet(Module):
-    def __init__(self,):
-        super(Module, self).__init__()
+    def __init__(self):
+        super().__init__()
         self.linear_relu_stack = Sequential(
             Linear(20, 16),
             ReLU(),
