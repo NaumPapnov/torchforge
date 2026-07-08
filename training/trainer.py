@@ -1,12 +1,16 @@
 from torch.nn import Module
-from torch import no_grad, max, save
+from torch import Tensor, cat, no_grad, save
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from tqdm.auto import tqdm
-from typing import Tuple
+from typing import Callable, Dict, Optional, Tuple
 from dataclasses import dataclass
+import os
+import datetime
 
 
+OUTPUT_PATH = 'outputs'
+MetricFn = Callable[[Tensor, Tensor], float]
 
 @dataclass
 class TrainerArgs:
@@ -16,8 +20,9 @@ class TrainerArgs:
     batch_size: int = 64
     device: str = 'cpu'
     epochs: int = 5
-    checkpoint_dir: str = 'output/folder'
+    output_dir: str = 'output'
     checkpoint_step: int = 1
+    metrics: Optional[Dict[str, MetricFn]] = None
          
 
 class Trainer: 
@@ -52,10 +57,11 @@ class Trainer:
         avg_loss = total_loss / len(self.train_data_loader)
         return avg_loss
 
-    def evaluate(self) -> Tuple[float, float]:
+    def evaluate(self) -> Tuple[float, Dict[str, float]]:
         self.model.eval()
         total_loss = 0.0
-        total_correct = 0
+        all_predictions = []
+        all_targets = []
 
         with no_grad():
             for x_batch, y_batch in tqdm(self.valid_data_loader, desc='Validation'):
@@ -64,33 +70,53 @@ class Trainer:
                 predictions = self.model(x_batch)
                 loss = self.args.loss_func(predictions, y_batch)
                 total_loss += loss.item()
-
-                _, predicted_labels = max(predictions, dim=-1)
-                total_correct += (predicted_labels == y_batch).sum().item()
+                all_predictions.append(predictions.detach())
+                all_targets.append(y_batch.detach())
 
             avg_loss = total_loss / len(self.valid_data_loader)
-            accuracy = total_correct / len(self.valid_data_loader.dataset)
-            return avg_loss, accuracy
+            avg_metrics = {}
+            if self.args.metrics and all_predictions:
+                predictions = cat(all_predictions, dim=0)
+                targets = cat(all_targets, dim=0)
+                for metric_name, metric_fn in self.args.metrics.items():
+                    metric_value = metric_fn(predictions, targets)
+                    if hasattr(metric_value, 'item'):
+                        metric_value = metric_value.item()
+                    avg_metrics[metric_name] = float(metric_value)
+            return avg_loss, avg_metrics
         
     def train(self):
         train_losses = []
         val_losses = []
-        val_accuracies = []
+        val_metrics_history = {name: [] for name in (self.args.metrics or {})}
+        
+        if not os.path.exists(self.args.output_dir):
+            os.mkdir(self.args.output_dir)
+            
+        run_path = f"{self.args.output_dir}/run-{str(datetime.datetime.now()).replace(' ', '_')}"
+        
+        os.mkdir(run_path)
 
         for epoch in range(self.args.epochs):
             print(f'\nEpoch {epoch+1}/{self.args.epochs}')
 
             train_loss = self._train_one_epoch()
-            val_loss, val_accur = self.evaluate()
+            val_loss, val_metrics = self.evaluate()
 
             train_losses.append(train_loss)
             val_losses.append(val_loss)
-            val_accuracies.append(val_accur)
+            for metric_name, metric_value in val_metrics.items():
+                val_metrics_history[metric_name].append(metric_value)
+
+            metrics_log = ''.join(
+                f'| Validation {metric_name.replace("_", " ").title()}: {metric_value:.4f} '
+                for metric_name, metric_value in val_metrics.items()
+            )
 
             print(f'Epoch {epoch+1} ->'
                 f'Train Loss: {train_loss:.4f} |'
-                f'Validation Loss: {val_loss:.4f} |'
-                f'Validation Accuracy: {val_accur:.4f}')
+                f'Validation Loss: {val_loss:.4f} '
+                f'{metrics_log}')
             
             if (epoch + 1) % self.args.checkpoint_step == 0:
                 save({
@@ -99,7 +125,7 @@ class Trainer:
                     "optimizer_state_dict": self.optimizer.state_dict(),
                     "train_loss": train_loss,
                     "val_loss": val_loss,
-                    "val_accuracy": val_accur,
-                }, f"{self.args.checkpoint_dir}/model_epoch_{epoch+1}.pt")
+                    "val_metrics": val_metrics,
+                }, f"{run_path}/model_epoch_{epoch+1}.pt")
 
-        return train_losses, val_losses, val_accuracies
+        return train_losses, val_losses, val_metrics_history

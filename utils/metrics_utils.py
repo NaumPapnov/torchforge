@@ -1,10 +1,8 @@
-from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
-from torch import max
 
 # utils to save metrics, generate plots, etc.
 
-def training_plot(train_losses, val_losses, val_accuracies):
+def training_plot(train_losses, val_losses, val_metrics_history=None):
     plt.figure(figsize=(12, 9))
 
     plt.subplot(2, 1, 1)
@@ -15,5 +13,7 @@ def training_plot(train_losses, val_losses, val_accuracies):
 
     plt.subplot(2, 1, 2)
     plt.xlabel('epoch')
-    plt.plot(val_accuracies, label='valid accuracy')
-    plt.legend()
+    if val_metrics_history:
+        for metric_name, metric_values in val_metrics_history.items():
+            plt.plot(metric_values, label=f'valid {metric_name}')
+        plt.legend()

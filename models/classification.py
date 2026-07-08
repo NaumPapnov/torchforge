@@ -1,20 +1,25 @@
-from torch.nn import Module, Sequential, Linear, ReLU, Sigmoid
+from torch.nn import Module, Sequential, Linear, ReLU, Sigmoid, BatchNorm1d
 
 class SimpleBinaryClassificationNet(Module):
-    def __init__(self):
+    def __init__(self, input_dim: int):
         super().__init__()
         self.linear_relu_stack = Sequential(
-            Linear(20, 16),
+            Linear(input_dim, 64),
+            BatchNorm1d(64),
             ReLU(),
-            Linear(16, 16),
+            Linear(64, 128),
+            BatchNorm1d(128),
             ReLU(),
-            Linear(16, 8),
+            Linear(128, 256),
+            BatchNorm1d(256),
             ReLU(),
-            Linear(8, 4),
+            Linear(256, 256),
+            BatchNorm1d(256),
             ReLU(),
-            Linear(4, 2),
+            Linear(256, 256),
+            BatchNorm1d(256),
             ReLU(),
-            Linear(2, 1)
+            Linear(256, 1)
         )
         self.activation = Sigmoid()
 
