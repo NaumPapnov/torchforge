@@ -1,7 +1,7 @@
 # here you write script for model training, e.g. loading data, initializing model and trainer, etc.
 # save results, checkpoints, etc. in the outputs directory, but dont push model weights to git, instead save them locally and add them to .gitignore
 from training.trainer import TrainerArgs, Trainer
-from torch.nn import MSELoss
+from torch.nn import MSELoss, L1Loss
 from torch.optim import Adam
 from models.regression import SimpleRegressionNet
 from sklearn.metrics import r2_score
@@ -28,7 +28,7 @@ def train(model, args, optimizer, train_data_loader, valid_data_loader):
 if __name__ == "__main__":
     
 
-    loss = MSELoss()
+    loss = L1Loss()
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
 
     args = TrainerArgs(
