@@ -47,7 +47,12 @@ class Trainer:
     def _train_one_epoch(self) -> float:
         self.model.train()
         total_loss = 0.0
-        for x_batch, y_batch in tqdm(self.train_data_loader, desc='Training'):
+        for x_batch, y_batch in tqdm(
+            self.train_data_loader,
+            desc='Training',
+            leave=False,
+            dynamic_ncols=True,
+        ):
             x_batch, y_batch = x_batch.to(self.args.device), y_batch.to(self.args.device)
 
             predictions = self.model(x_batch)
@@ -67,7 +72,12 @@ class Trainer:
         all_targets = []
 
         with no_grad():
-            for x_batch, y_batch in tqdm(self.valid_data_loader, desc='Validation'):
+            for x_batch, y_batch in tqdm(
+                self.valid_data_loader,
+                desc='Validation',
+                leave=False,
+                dynamic_ncols=True,
+            ):
                 x_batch, y_batch = x_batch.to(self.args.device), y_batch.to(self.args.device)
 
                 predictions = self.model(x_batch)
@@ -100,9 +110,10 @@ class Trainer:
         
         os.mkdir(run_path)
 
-        for epoch in range(self.args.epochs):
-            print(f'\nEpoch {epoch+1}/{self.args.epochs}')
+        epoch_bar = tqdm(range(self.args.epochs), desc='Epochs', dynamic_ncols=True)
+        final_metrics_log = ''
 
+        for epoch in epoch_bar:
             train_loss = self._train_one_epoch()
             val_loss, val_metrics = self.evaluate()
 
@@ -115,11 +126,16 @@ class Trainer:
                 f'| Validation {metric_name.replace("_", " ").title()}: {metric_value:.4f} '
                 for metric_name, metric_value in val_metrics.items()
             )
+            final_metrics_log = metrics_log
 
-            print(f'Epoch {epoch+1} ->'
-                f'Train Loss: {train_loss:.4f} |'
-                f'Validation Loss: {val_loss:.4f} '
-                f'{metrics_log}')
+            epoch_bar.set_postfix({
+                'train_loss': f'{train_loss:.4f}',
+                'val_loss': f'{val_loss:.4f}',
+                **{
+                    metric_name.lower(): f'{metric_value:.4f}'
+                    for metric_name, metric_value in val_metrics.items()
+                },
+            })
             
             if (epoch + 1) % self.args.checkpoint_step == 0:
                 save({
@@ -130,6 +146,14 @@ class Trainer:
                     "val_loss": val_loss,
                     "val_metrics": val_metrics,
                 }, f"{run_path}/model_epoch_{epoch+1}.pt")
+
+        epoch_bar.close()
+        print(
+            f'Epoch {self.args.epochs} ->'
+            f'Train Loss: {train_losses[-1]:.4f} |'
+            f'Validation Loss: {val_losses[-1]:.4f} '
+            f'{final_metrics_log}'
+        )
 
         if self.args.draw_plots:
             os.mkdir(f'{run_path}/plots')

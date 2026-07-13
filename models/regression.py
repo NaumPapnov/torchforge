@@ -1,4 +1,6 @@
 from torch.nn import Module, Sequential, Linear, ReLU, BatchNorm1d
+
+
 class SimpleRegressionNet(Module):
     def __init__(self, input_dim: int):
         super().__init__()

@@ -28,7 +28,7 @@ def train(model, args, optimizer, train_data_loader, valid_data_loader):
 if __name__ == "__main__":
     
 
-    loss = L1Loss()
+    loss = MSELoss()
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
 
     args = TrainerArgs(
@@ -49,14 +49,17 @@ if __name__ == "__main__":
     encoded_columns_name = oh_encoder.get_feature_names_out(obj)
     data = data.drop(columns=obj)
     data = pd.concat([data, pd.DataFrame(ohe_data, columns=encoded_columns_name)], axis=1)
-    X, y = data.drop(columns=['charges']), data['charges']
-    scaler = StandardScaler()
-    X = pd.DataFrame(
-        scaler.fit_transform(X),
-        columns=X.columns,
-        index=X.index
-    )
-    X_train, X_val, y_train, y_val = train_test_split(X, y)
+    X, y = data.drop(columns=["charges"]), data["charges"]
+
+    X_train, X_val, y_train, y_val = train_test_split(X, y, random_state=42)
+
+    x_scaler = StandardScaler()
+    X_train = pd.DataFrame(x_scaler.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
+    X_val = pd.DataFrame(x_scaler.transform(X_val), columns=X_val.columns, index=X_val.index)
+
+    y_scaler = StandardScaler()
+    y_train = pd.Series(y_scaler.fit_transform(y_train.to_frame()).ravel(), index=y_train.index)
+    y_val = pd.Series(y_scaler.transform(y_val.to_frame()).ravel(), index=y_val.index)
     train_dataset = RegressionTableDataset(X_train, y_train)
     valid_dataset = RegressionTableDataset(X_val, y_val)
     train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
