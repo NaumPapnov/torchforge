@@ -5,8 +5,10 @@ from torch.optim import Optimizer
 from tqdm.auto import tqdm
 from typing import Callable, Dict, Optional, Tuple
 from dataclasses import dataclass
+from utils.metrics_utils import training_plot
 import os
 import datetime
+import matplotlib.pyplot as plt
 
 
 OUTPUT_PATH = 'outputs'
@@ -23,6 +25,7 @@ class TrainerArgs:
     output_dir: str = 'output'
     checkpoint_step: int = 1
     metrics: Optional[Dict[str, MetricFn]] = None
+    draw_plots: bool = True
          
 
 class Trainer: 
@@ -127,5 +130,10 @@ class Trainer:
                     "val_loss": val_loss,
                     "val_metrics": val_metrics,
                 }, f"{run_path}/model_epoch_{epoch+1}.pt")
+
+        if self.args.draw_plots:
+            os.mkdir(f'{run_path}/plots')
+            training_plot(train_losses, val_losses, val_metrics_history)
+            plt.savefig(f'{run_path}/plots/losses_and_mterics.png')
 
         return train_losses, val_losses, val_metrics_history
