@@ -1,5 +1,18 @@
-from torch.nn import Module, Sequential, Linear, ReLU, Sigmoid
-from torch.nn import BatchNorm1d, BatchNorm2d, Conv2d, MaxPool2d, Softmax
+from torch import cat
+from torch.nn import (
+    BatchNorm1d,
+    BatchNorm2d,
+    Conv2d,
+    Dropout,
+    Linear,
+    MaxPool2d,
+    Module,
+    ReLU,
+    Sequential,
+    Sigmoid,
+)
+
+
 class SimpleBinaryClassificationNet(Module):
     def __init__(self, input_dim: int):
         super().__init__()
@@ -87,5 +100,86 @@ class VGG11(Module):
         x = self.conv4(x)
         x = x.view(x.size(0), -1)
         #print(f'\nSize of x: {x.shape}')
+        x = self.fc(x)
+        return x
+
+class Inception(Module):
+    def __init__(self,
+                 in_channels: int,
+                 cn1x1: int,
+                 cn3x3reduce: int,
+                 cn3x3: int,
+                 cn5x5reduce: int,
+                 cn5x5: int,
+                 poolcn1x1: int):
+        super().__init__()
+        self.branch1 = Sequential(
+            Conv2d(in_channels=in_channels, out_channels=cn1x1, kernel_size=1, padding = 0),
+            BatchNorm2d(cn1x1),
+            ReLU()
+        )
+        self.branch2 = Sequential(
+            Conv2d(in_channels=in_channels, out_channels=cn3x3reduce, kernel_size=1, padding = 0),
+            BatchNorm2d(cn3x3reduce),
+            ReLU(),
+            Conv2d(in_channels=cn3x3reduce, out_channels=cn3x3, kernel_size=3, padding = 1),
+            BatchNorm2d(cn3x3),
+            ReLU()
+        )
+        self.branch3 = Sequential(
+            Conv2d(in_channels=in_channels, out_channels=cn5x5reduce, kernel_size=1, padding = 0),
+            BatchNorm2d(cn5x5reduce),
+            ReLU(),
+            Conv2d(in_channels=cn5x5reduce, out_channels=cn5x5, kernel_size=5, padding = 2),
+            BatchNorm2d(cn5x5),
+            ReLU()
+        )
+        self.branch4 = Sequential(
+            MaxPool2d(kernel_size=3, stride=1, padding = 1),
+            Conv2d(in_channels=in_channels, out_channels=poolcn1x1, kernel_size=1, padding = 0),
+            BatchNorm2d(poolcn1x1),
+            ReLU()
+        )
+
+    def forward(self, x):
+        branch1 = self.branch1(x)
+        branch2 = self.branch2(x)
+        branch3 = self.branch3(x)
+        branch4 = self.branch4(x)
+        output = cat([branch1, branch2, branch3, branch4], 1)
+        return output
+
+class GoogleNet(Module):
+    def __init__(self, input_channels: int):
+        super().__init__()
+        self.conv1 = Sequential(
+            Conv2d(in_channels=input_channels, out_channels=64, kernel_size=7, stride=2, padding=1),
+            BatchNorm2d(64),
+            ReLU(),
+            MaxPool2d(kernel_size=3, stride=2)
+        )
+        self.conv2 = Sequential(
+            Conv2d(in_channels=64, out_channels=64, kernel_size=1, stride=1, padding=1),
+            BatchNorm2d(64),
+            ReLU(),
+            Conv2d(in_channels=64, out_channels=192, kernel_size=3, stride=1, padding=1),
+            BatchNorm2d(192),
+            ReLU(),
+            MaxPool2d(kernel_size=3, stride=2)
+        )
+        self.inception3a = Inception(192, 64, 96, 128, 16, 32, 32)
+        self.inception3b = Inception(256, 128, 128, 192, 32, 96, 64)
+        self.maxpool = MaxPool2d(kernel_size=3, stride=2)
+        self.dropout = Dropout(p=0.4)
+        self.fc = Linear(480, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.inception3a(x)
+        x = self.inception3b(x)
+        x = self.maxpool(x)
+        x = self.dropout(x)
+        x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
