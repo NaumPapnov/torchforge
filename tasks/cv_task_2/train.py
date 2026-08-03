@@ -19,8 +19,8 @@ def f1(predictions, targets):
         average='macro'
     )
 
-def train(model, args, optimizer, train_data_loader, valid_data_loader):
-    trainer = Trainer(model, args, optimizer, train_data_loader, valid_data_loader)
+def train(model, args, optimizer, train_data_loader, valid_data_loader, aux):
+    trainer = Trainer(model, args, optimizer, train_data_loader, valid_data_loader, aux)
     trainer.train()
 
 def evaluate(model, args, optimizer, train_data_loader, test_data_loader):
@@ -67,9 +67,9 @@ if __name__ == "__main__":
     valloader = DataLoader(valset, batch_size=args.batch_size, shuffle=False)
     testloader = DataLoader(testset, batch_size=args.batch_size, shuffle=False)
 
-    model = GoogleNet(input_channels=3)
+    model = GoogleNet(in_channels=3, num_classes=10)
     optimizer = Adam(model.parameters(), args.learning_rate)
 
-    train(model, args, optimizer, trainloader, valloader)
+    train(model, args, optimizer, trainloader, valloader, aux=True)
     loss, metrics = evaluate(model, args, optimizer, trainloader, testloader)
     print(f'\nTest loss: {loss}, \tTest metrics {metrics}')
