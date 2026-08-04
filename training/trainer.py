@@ -9,6 +9,7 @@ from utils.metrics_utils import training_plot
 import os
 import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 OUTPUT_PATH = 'outputs'
@@ -36,13 +37,15 @@ class Trainer:
         args: TrainerArgs,
         optimizer: Optimizer,
         train_data_loader: DataLoader,
-        valid_data_loader: DataLoader
+        valid_data_loader: DataLoader,
+        aux: bool = False
     ) -> None:
         self.model = model.to(args.device)
         self.args = args
         self.optimizer = optimizer
         self.train_data_loader = train_data_loader
         self.valid_data_loader = valid_data_loader
+        self.aux = aux
 
     def _train_one_epoch(self) -> float:
         self.model.train()
@@ -55,8 +58,20 @@ class Trainer:
         ):
             x_batch, y_batch = x_batch.to(self.args.device), y_batch.to(self.args.device)
 
-            predictions = self.model(x_batch)
-            loss = self.args.loss_func(predictions, y_batch)
+            loss = 0
+            if self.aux:
+                predictions, *auxes = self.model(x_batch)
+                
+                loss_main = self.args.loss_func(predictions, y_batch)
+                loss_aux = 0.3 * sum(
+                    self.args.loss_func(aux_pred, y_batch)
+                    for aux_pred in auxes
+                )
+
+                loss = loss_main + loss_aux
+            else:
+                predictions = self.model(x_batch)
+                loss = self.args.loss_func(predictions, y_batch)
 
             total_loss += loss.item()
             loss.backward()
