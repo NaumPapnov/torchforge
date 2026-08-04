@@ -7,6 +7,7 @@ from torch.nn import (
     Linear,
     MaxPool2d,
     AvgPool2d,
+    AdaptiveAvgPool2d,
     Module,
     ReLU,
     Sequential,
@@ -227,3 +228,93 @@ class GoogleNet(Module):
             return x, aux2, aux1
         else:
             return x
+
+class ResNet18StandartBlock(Module):
+    def __init__(
+            self, 
+            in_channels: int, 
+            out_channels: int,
+            kernel_size: int = 3,
+            padding: int = 1,
+            stride: int = 1,
+            use_downsample: bool = False
+            ):
+        super().__init__()
+        self.use_downsample = use_downsample
+        self.conv1 =  Conv2d(
+                    in_channels=in_channels, 
+                    out_channels=out_channels,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                    padding=padding
+                    )
+        self.bn1 = BatchNorm2d(out_channels)
+        self.relu = ReLU()
+        self.conv2 = Conv2d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_size,
+                padding=padding
+            )
+        self.bn2 = BatchNorm2d(out_channels)
+        self.downsample = Sequential(
+            Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                stride=stride
+            ),
+            BatchNorm2d(out_channels)
+            )
+
+    def forward(self, x):
+        y = x
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        if self.use_downsample:
+            y = self.downsample(y)
+        x += y
+        x= self.relu(x)
+        return x
+
+class ResNet18(Module):
+    def __init__(
+            self,
+            in_channels: int,
+            ):
+        super().__init__()
+        self.conv1 = Conv2d(in_channels=in_channels, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn1 = BatchNorm2d(64)
+        self.relu = ReLU()
+        self.layer1 = ResNet18StandartBlock(64, 64, 3, 1, 1)
+        self.layer2 = ResNet18StandartBlock(64, 64, 3, 1, 1)
+        self.layer3 = ResNet18StandartBlock(64, 128, 3, 1, 2, True)
+        self.layer4 = ResNet18StandartBlock(128, 128, 3, 1, 1)
+        self.layer5 = ResNet18StandartBlock(128, 256, 3, 1, 2, True)
+        self.layer6 = ResNet18StandartBlock(256, 256, 3, 1)
+        self.layer7 = ResNet18StandartBlock(256, 512, 3, 1, 2, True)
+        self.layer8 = ResNet18StandartBlock(512, 512, 3, 1)
+        self.avgpool = AdaptiveAvgPool2d((1,1))
+        self.flatten = Flatten()
+        self.fc = Linear(512, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = self.layer6(x)
+        x = self.layer7(x)
+        x = self.layer8(x)
+        x = self.avgpool(x)
+        x = self.flatten(x)
+        x = self.fc(x)
+        return x
+
