@@ -1,16 +1,16 @@
 from torch import cat
 from torch.nn import (
+    AdaptiveAvgPool2d,
     BatchNorm1d,
     BatchNorm2d,
     Conv2d,
     Dropout,
+    Flatten,
     Linear,
     MaxPool2d,
-    AdaptiveAvgPool2d,
     Module,
     ReLU,
     Sequential,
-    Flatten
 )
 
 

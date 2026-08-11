@@ -1,15 +1,17 @@
 
-import torch
 import os
-from training.trainer import TrainerArgs, Trainer
-from models.classification import ResNet18
+
+import torch
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
+from torch.utils.data import DataLoader, Subset
 from torchvision.datasets import CIFAR10
 from torchvision.transforms import v2
-from torch.utils.data import DataLoader, Subset
-from sklearn.model_selection import train_test_split
-from torch.optim import Adam
-from sklearn.metrics import f1_score
+
+from models.classification.cv import ResNet18
+from training.trainer import Trainer, TrainerArgs
 
 
 def f1(predictions, target):
