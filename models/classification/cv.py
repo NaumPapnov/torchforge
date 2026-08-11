@@ -6,11 +6,7 @@ from torch.nn import (
     Dropout,
     Linear,
     MaxPool2d,
-<<<<<<< HEAD:models/classification.py
-    AvgPool2d,
     AdaptiveAvgPool2d,
-=======
->>>>>>> cv_task_4:models/classification/cv.py
     Module,
     ReLU,
     Sequential,
