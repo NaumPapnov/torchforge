@@ -11,7 +11,10 @@ from torch.nn import (
     Module,
     ReLU,
     Sequential,
+    Identity,
+    Sigmoid
 )
+from torchvision.models import resnet34, ResNet34_Weights
 
 
 class VGG11(Module):
@@ -287,3 +290,54 @@ class ResNet18(Module):
         x = self.fc(x)
         return x
 
+class SimpleObjectDetection(Module):
+    def __init__(self, out_features=200):
+        super().__init__()
+        self.backbone = resnet34(weights=ResNet34_Weights.DEFAULT)
+
+        in_features = self.backbone.fc.in_features
+
+        self.backbone.fc = Identity()
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+
+        self.mlp = Sequential(
+            Linear(in_features, 512),
+            BatchNorm1d(512),
+            ReLU(),
+            Dropout(0.3),
+            Linear(512, 512),
+            BatchNorm1d(512),
+            ReLU(),
+        )
+        
+        self.classification_head = Sequential(
+            Linear(512, 512),
+            BatchNorm1d(512),
+            ReLU(),
+            Dropout(0.3),
+            Linear(512, 512),
+            BatchNorm1d(512),
+            ReLU(),
+            Dropout(0.3),
+            Linear(512, out_features)
+        )
+
+        self.bounding_box_head = Sequential(
+            Linear(512, 256),
+            BatchNorm1d(256),
+            ReLU(),
+            Dropout(0.3),
+            Linear(256, 128),
+            BatchNorm1d(128),
+            ReLU(),
+            Dropout(0.3),
+            Linear(128, 4),
+            Sigmoid()
+        )
+
+    def forward(self, x):
+        x = self.backbone(x)
+        classification_logits = self.classification_head(x)
+        bbox = self.bounding_box_head(x)
+        return classification_logits, bbox
