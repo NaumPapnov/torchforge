@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from numpy import ndarray
 from pandas import DataFrame, Series
-from torch import FloatTensor, tensor, long
+from torch import FloatTensor, Tensor, tensor, long
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 from torchvision.tv_tensors import BoundingBoxes
@@ -57,14 +57,18 @@ class ObjectDetectionDataset(Dataset):
         label = tensor(self.img_labels.iloc[idx].item() - 1, dtype=long)
         x, y, w, h = self.img_bbox.iloc[idx].values
         x_min, x_max, y_min, y_max = x , x + w, y, y + h
+        # форма (1, 4): BoundingBoxes должен остаться tv_tensor'ом до конца
+        # трансформов, иначе v2 не станет его преобразовывать вместе с картинкой
         bbox = BoundingBoxes(
-            [x_min, y_min, x_max, y_max],
+            [[x_min, y_min, x_max, y_max]],
             format="XYXY",
             canvas_size=(height, width)
         )
-        bbox = bbox.reshape(4)
-        bbox[0::2] /= width
-        bbox[1::2] /= height
         if self.transform:
             image, bbox = self.transform(image, bbox)
-        return image, label, bbox
+        # нормализуем уже после трансформов — по итоговому размеру 
+        canvas_height, canvas_width = bbox.canvas_size
+        bbox = bbox.as_subclass(Tensor).reshape(4).float()
+        bbox[0::2] /= canvas_width
+        bbox[1::2] /= canvas_height
+        return image, label, bbox.clamp_(0.0, 1.0)

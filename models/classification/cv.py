@@ -11,7 +11,6 @@ from torch.nn import (
     Module,
     ReLU,
     Sequential,
-    Identity,
     Sigmoid
 )
 from torchvision.models import resnet34, ResNet34_Weights
@@ -291,32 +290,28 @@ class ResNet18(Module):
         return x
 
 class SimpleObjectDetection(Module):
-    def __init__(self, out_features=200):
+
+    def __init__(self, out_features=200, trainable_backbone_layers=2, box_grid=3):
         super().__init__()
-        self.backbone = resnet34(weights=ResNet34_Weights.DEFAULT)
+        backbone = resnet34(weights=ResNet34_Weights.DEFAULT)
+        in_features = backbone.fc.in_features
 
-        in_features = self.backbone.fc.in_features
+        # всё до avgpool: на входе 384x384 это карта признаков 512x12x12
+        self.trunk = Sequential(*list(backbone.children())[:-2])
 
-        self.backbone.fc = Identity()
-        for param in self.backbone.parameters():
+        for param in self.trunk.parameters():
             param.requires_grad = False
+        res_layers = [self.trunk[4], self.trunk[5], self.trunk[6], self.trunk[7]]
+        for layer in res_layers[len(res_layers) - trainable_backbone_layers:]:
+            for param in layer.parameters():
+                param.requires_grad = True
 
-        self.mlp = Sequential(
-            Linear(in_features, 512),
-            BatchNorm1d(512),
-            ReLU(),
-            Dropout(0.3),
-            Linear(512, 512),
-            BatchNorm1d(512),
-            ReLU(),
-        )
-        
+        self.pool_cls = AdaptiveAvgPool2d(1)
+        self.pool_box = AdaptiveAvgPool2d(box_grid)
+
         self.classification_head = Sequential(
-            Linear(512, 512),
-            BatchNorm1d(512),
-            ReLU(),
-            Dropout(0.3),
-            Linear(512, 512),
+            Flatten(),
+            Linear(in_features, 512),
             BatchNorm1d(512),
             ReLU(),
             Dropout(0.3),
@@ -324,20 +319,20 @@ class SimpleObjectDetection(Module):
         )
 
         self.bounding_box_head = Sequential(
+            Flatten(),
+            Linear(in_features * box_grid * box_grid, 512),
+            BatchNorm1d(512),
+            ReLU(),
+            Dropout(0.2),
             Linear(512, 256),
             BatchNorm1d(256),
             ReLU(),
-            Dropout(0.3),
-            Linear(256, 128),
-            BatchNorm1d(128),
-            ReLU(),
-            Dropout(0.3),
-            Linear(128, 4),
+            Linear(256, 4),
             Sigmoid()
         )
 
     def forward(self, x):
-        x = self.backbone(x)
-        classification_logits = self.classification_head(x)
-        bbox = self.bounding_box_head(x)
+        features = self.trunk(x)
+        classification_logits = self.classification_head(self.pool_cls(features))
+        bbox = self.bounding_box_head(self.pool_box(features))
         return classification_logits, bbox
