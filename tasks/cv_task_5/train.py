@@ -17,7 +17,7 @@ from training.trainer import Trainer, TrainerArgs
 from utils.data_utils import show_images
 
 # официальный архив CUB_200_2011.tgz разворачивается именно в такую структуру
-DATA_ROOT = './data/CUB_200_2011'
+DATA_ROOT = './data/CUB_200_2011/CUB_200_2011'
 
 
 def f1(pred, target):
